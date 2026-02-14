@@ -487,9 +487,9 @@ export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
           <AnimatePresence>
             {replyingTo && (
               <motion.div 
-                initial={{ opacity: 0, height: 0, mb: 0 }}
-                animate={{ opacity: 1, height: "auto", mb: 8 }}
-                exit={{ opacity: 0, height: 0, mb: 0 }}
+                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                animate={{ opacity: 1, height: "auto", marginBottom: 8 }}
+                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                 className="flex items-center justify-between bg-muted/50 p-2 rounded-md text-xs border-l-2 border-primary overflow-hidden"
               >
                 <div className="flex flex-col gap-0.5 max-w-[90%]">
