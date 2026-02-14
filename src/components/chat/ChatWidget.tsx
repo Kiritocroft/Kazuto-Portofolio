@@ -12,7 +12,8 @@ import {
   Sparkles,
   Trash2,
   Pin,
-  PinOff
+  PinOff,
+  Reply
 } from "lucide-react";
 import { 
   collection, 
@@ -34,7 +35,7 @@ import {
   type User
 } from "firebase/auth";
 import { auth, db, googleProvider } from "@/lib/firebase";
-import { isAdminEmail } from "@/lib/admin";
+import { isAdminEmail, ADMIN_EMAILS } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,9 +52,16 @@ interface Message {
   uid: string;
   displayName: string;
   photoURL: string;
+  email?: string;
   createdAt: Timestamp | null;
   isAdmin?: boolean;
   isPinned?: boolean;
+  replyTo?: {
+    id: string;
+    displayName: string;
+    text: string;
+    email?: string;
+  };
 }
 
 export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
@@ -62,6 +70,7 @@ export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
   const [user, setUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -153,16 +162,83 @@ export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
     if (!newMessage.trim() || !user || !db) return;
 
     try {
-      await addDoc(collection(db, "messages"), {
+      const messageData: any = {
         text: newMessage,
         uid: user.uid,
         displayName: user.displayName,
         photoURL: user.photoURL,
+        email: user.email || null, // Save email for notifications, fallback to null
         createdAt: serverTimestamp(),
         isAdmin: isAdminEmail(user.email),
         isPinned: false,
-      });
+      };
+
+      if (replyingTo) {
+        messageData.replyTo = {
+          id: replyingTo.id,
+          displayName: replyingTo.displayName,
+          text: replyingTo.text.substring(0, 50) + (replyingTo.text.length > 50 ? "..." : ""),
+          email: replyingTo.email || null // Fallback to null if undefined
+        };
+      }
+
+      await addDoc(collection(db, "messages"), messageData);
+
+      // Send Email Notification
+      try {
+        const isAdmin = isAdminEmail(user.email);
+        
+        // 1. If Admin replies to a User -> Notify User
+        if (isAdmin && replyingTo?.email) {
+          await fetch("/api/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: replyingTo.email,
+              subject: "New Reply from Kazuto",
+              html: `
+                <div style="font-family: sans-serif; padding: 20px;">
+                  <h2>You have a new reply!</h2>
+                  <p><strong>Kazuto</strong> replied to your message:</p>
+                  <blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #666;">
+                    "${replyingTo.text}"
+                  </blockquote>
+                  <p>Reply:</p>
+                  <p style="background: #f0f0f0; padding: 10px; border-radius: 5px;">${newMessage}</p>
+                  <a href="https://kazuto-portofolio.vercel.app" style="display: inline-block; margin-top: 10px; padding: 10px 20px; background: #000; color: #fff; text-decoration: none; border-radius: 5px;">View Chat</a>
+                </div>
+              `
+            })
+          });
+        }
+        
+        // 2. If User sends a message (or reply) -> Notify Admin
+        // Don't notify if Admin is talking to themselves
+        if (!isAdmin) {
+          await fetch("/api/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: ADMIN_EMAILS[0],
+              subject: "New Chat Message on Portfolio",
+              html: `
+                <div style="font-family: sans-serif; padding: 20px;">
+                  <h2>New Message</h2>
+                  <p><strong>${user.displayName}</strong> says:</p>
+                  <p style="background: #f0f0f0; padding: 10px; border-radius: 5px;">${newMessage}</p>
+                  ${replyingTo ? `<p>Replying to: <em>${replyingTo.text}</em></p>` : ""}
+                  <a href="https://kazuto-portofolio.vercel.app/admin" style="display: inline-block; margin-top: 10px; padding: 10px 20px; background: #000; color: #fff; text-decoration: none; border-radius: 5px;">Reply in Admin</a>
+                </div>
+              `
+            })
+          });
+        }
+      } catch (emailError) {
+        console.error("Failed to send email notification:", emailError);
+      }
+
       setNewMessage("");
+      setReplyingTo(null);
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error("Failed to send message");
@@ -343,6 +419,15 @@ export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
                               )
                         )}
                       >
+                        {msg.replyTo && (
+                          <div className={cn(
+                            "text-[10px] p-1.5 rounded mb-1 border-l-2 opacity-90",
+                            isMe ? "bg-white/10 border-white/50 text-white/90" : "bg-black/5 dark:bg-white/5 border-primary/50"
+                          )}>
+                            <span className="font-semibold block opacity-75 mb-0.5">{msg.replyTo.displayName}</span>
+                            <span className="line-clamp-1">{msg.replyTo.text}</span>
+                          </div>
+                        )}
                         <p className="leading-relaxed break-words text-xs md:text-sm">{msg.text}</p>
                         <span className={cn(
                           "text-[9px] absolute -bottom-4 min-w-[40px] opacity-0 group-hover:opacity-100 transition-opacity duration-200",
@@ -351,28 +436,41 @@ export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
                           {formatTime(msg.createdAt)}
                         </span>
                         
-                        {/* Admin Actions */}
-                        {isAdminUser && (
-                          <div className="absolute -top-2 -right-8 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <button
-                              onClick={() => handleTogglePin(msg.id, msg.isPinned)}
-                              className={cn(
-                                "p-1 rounded-full shadow-sm hover:scale-110 transition-transform",
-                                isPinned ? "bg-amber-100 text-amber-600" : "bg-muted text-muted-foreground"
-                              )}
-                              title={isPinned ? "Unpin message" : "Pin message"}
+                        {/* Message Actions */}
+                        <div className={cn(
+                          "absolute -top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10",
+                          isMe ? "-left-8 flex-row-reverse" : "-right-8"
+                        )}>
+                           <button
+                              onClick={() => setReplyingTo(msg)}
+                              className="p-1.5 bg-background border border-border rounded-full shadow-sm hover:scale-110 transition-transform text-muted-foreground hover:text-primary"
+                              title="Reply"
                             >
-                              {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+                              <Reply className="h-3 w-3" />
                             </button>
-                            <button
-                              onClick={() => handleDeleteMessage(msg.id)}
-                              className="p-1 bg-destructive text-destructive-foreground rounded-full shadow-sm hover:scale-110 transition-transform"
-                              title="Delete message"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </div>
-                        )}
+                            
+                          {isAdminUser && (
+                            <>
+                              <button
+                                onClick={() => handleTogglePin(msg.id, msg.isPinned)}
+                                className={cn(
+                                  "p-1.5 border rounded-full shadow-sm hover:scale-110 transition-transform",
+                                  isPinned ? "bg-amber-100 border-amber-200 text-amber-600" : "bg-background border-border text-muted-foreground hover:text-amber-500"
+                                )}
+                                title={isPinned ? "Unpin message" : "Pin message"}
+                              >
+                                {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                className="p-1.5 bg-background border border-border text-destructive rounded-full shadow-sm hover:scale-110 transition-transform hover:bg-destructive hover:text-destructive-foreground"
+                                title="Delete message"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -385,7 +483,28 @@ export function ChatWidget({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       {user && (
-        <CardFooter className="p-3 border-t bg-muted/20 backdrop-blur-sm">
+        <CardFooter className="p-3 border-t bg-muted/20 backdrop-blur-sm flex-col gap-2 items-stretch">
+          <AnimatePresence>
+            {replyingTo && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0, mb: 0 }}
+                animate={{ opacity: 1, height: "auto", mb: 8 }}
+                exit={{ opacity: 0, height: 0, mb: 0 }}
+                className="flex items-center justify-between bg-muted/50 p-2 rounded-md text-xs border-l-2 border-primary overflow-hidden"
+              >
+                <div className="flex flex-col gap-0.5 max-w-[90%]">
+                  <span className="font-medium text-primary">Replying to {replyingTo.displayName}</span>
+                  <span className="text-muted-foreground truncate">{replyingTo.text}</span>
+                </div>
+                <button 
+                  onClick={() => setReplyingTo(null)} 
+                  className="p-1 hover:bg-background rounded-full transition-colors text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <form
             onSubmit={handleSendMessage}
             className="flex w-full items-center gap-2"

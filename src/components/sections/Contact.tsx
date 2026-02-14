@@ -2,16 +2,60 @@
 
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send } from "lucide-react";
+import { Send, Loader2 } from "lucide-react";
 import { TextReveal } from "@/components/blocks/TextReveal";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { motion } from "framer-motion";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 
 export function Contact() {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    subject: "",
+    message: ""
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.email || !formData.message) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (!db) throw new Error("Database not initialized");
+
+      await addDoc(collection(db, "contacts"), {
+        ...formData,
+        createdAt: serverTimestamp(),
+      });
+
+      toast.success("Message sent successfully! I'll get back to you soon.");
+      setFormData({ name: "", email: "", subject: "", message: "" });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <section id="contact" className="py-20 relative overflow-hidden">
       <div className="container mx-auto px-4">
@@ -43,30 +87,64 @@ export function Contact() {
                 <CardDescription>I'll get back to you as soon as possible.</CardDescription>
               </CardHeader>
               <CardContent>
-                <form className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label htmlFor="name" className="text-sm font-medium">Name</label>
-                      <Input id="name" placeholder="Your Name" className="transition-all duration-300 focus:scale-[1.01]" />
+                      <Input 
+                        id="name" 
+                        placeholder="Your Name" 
+                        value={formData.name}
+                        onChange={handleChange}
+                        disabled={loading}
+                        className="transition-all duration-300 focus:scale-[1.01]" 
+                      />
                     </div>
                     <div className="space-y-2">
                       <label htmlFor="email" className="text-sm font-medium">Email</label>
-                      <Input id="email" type="email" placeholder="your@email.com" className="transition-all duration-300 focus:scale-[1.01]" />
+                      <Input 
+                        id="email" 
+                        type="email" 
+                        placeholder="your@email.com" 
+                        value={formData.email}
+                        onChange={handleChange}
+                        disabled={loading}
+                        className="transition-all duration-300 focus:scale-[1.01]" 
+                      />
                     </div>
                   </div>
                   
                   <div className="space-y-2">
                     <label htmlFor="subject" className="text-sm font-medium">Subject</label>
-                    <Input id="subject" placeholder="Project Inquiry" className="transition-all duration-300 focus:scale-[1.01]" />
+                    <Input 
+                      id="subject" 
+                      placeholder="Project Inquiry" 
+                      value={formData.subject}
+                      onChange={handleChange}
+                      disabled={loading}
+                      className="transition-all duration-300 focus:scale-[1.01]" 
+                    />
                   </div>
                   
                   <div className="space-y-2">
                     <label htmlFor="message" className="text-sm font-medium">Message</label>
-                    <Textarea id="message" placeholder="Tell me about your project..." className="min-h-[150px] transition-all duration-300 focus:scale-[1.01]" />
+                    <Textarea 
+                      id="message" 
+                      placeholder="Tell me about your project..." 
+                      value={formData.message}
+                      onChange={handleChange}
+                      disabled={loading}
+                      className="min-h-[150px] transition-all duration-300 focus:scale-[1.01]" 
+                    />
                   </div>
 
-                  <Button type="submit" className="w-full group">
-                    <Send className="mr-2 h-4 w-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /> Send Message
+                  <Button type="submit" className="w-full group" disabled={loading}>
+                    {loading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-4 w-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                    )}
+                    Send Message
                   </Button>
                 </form>
               </CardContent>
