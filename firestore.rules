@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'nabilganteng03@gmail.com';
+    }
+
+    // Projects: Public read, Admin write
+    match /projects/{projectId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Certificates: Public read, Admin write
+    match /certificates/{certificateId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Messages: Public read/create, Admin delete/update (pin)
+    match /messages/{messageId} {
+      allow read, create: if true;
+      allow delete: if isAdmin();
+      allow update: if isAdmin(); // Allow admin to pin/unpin
+    }
+
+    // Settings: Public read, Admin write
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Analytics: Public read/update/create
+    match /analytics/{docId} {
+      allow read: if true;
+      allow update: if true; 
+      allow create: if true; // Allow creation for first-time visitors
+    }
+  }
+}

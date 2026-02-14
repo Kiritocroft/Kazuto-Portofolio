@@ -1,12 +1,21 @@
-
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect, useState } from "react";
 import { motion, useScroll, useSpring, useTransform } from "framer-motion";
-import { portfolioData } from "@/data/portfolio";
 import { Briefcase, Code, GraduationCap, Terminal } from "lucide-react";
 
+interface ExperienceItem {
+  id: string;
+  title: string;
+  company: string;
+  year: string;
+  description: string;
+  type?: "work" | "education";
+}
+
 export function Experience() {
+  const [experiences, setExperiences] = useState<ExperienceItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -21,7 +30,33 @@ export function Experience() {
 
   const dotTop = useTransform(scaleY, [0, 1], ['0%', '100%']);
 
-  const icons = [GraduationCap, GraduationCap, Briefcase, Briefcase]; // Icons for decoration
+  useEffect(() => {
+    const fetchExperience = async () => {
+      try {
+        const res = await fetch('/api/experience');
+        if (res.ok) {
+           const data = await res.json();
+           setExperiences(data);
+        } else {
+           throw new Error("Failed to fetch experience");
+        }
+      } catch (err) {
+        console.error("Failed to fetch experience", err);
+        setError("Failed to load experience. Please try again later.");
+      }
+    };
+    fetchExperience();
+  }, []);
+
+  if (error) {
+    return (
+      <section id="experience" className="py-20 relative overflow-hidden">
+        <div className="container mx-auto px-4 text-center text-destructive">
+          <p>{error}</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="experience" className="py-20 relative overflow-hidden">
@@ -50,8 +85,8 @@ export function Experience() {
           />
 
           <div className="space-y-12">
-            {portfolioData.experiences.map((exp, index) => {
-              const Icon = icons[index % icons.length];
+            {experiences.map((exp, index) => {
+              const Icon = exp.type === "education" ? GraduationCap : Briefcase;
               return (
                 <motion.div 
                   key={exp.id} 

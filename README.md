@@ -21,7 +21,8 @@ A modern, interactive, and high-performance personal portfolio website built wit
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 - **UI Library**: [shadcn/ui](https://ui.shadcn.com/)
 - **Animations**: [Framer Motion](https://www.framer.com/motion/)
-- **Backend/Auth**: [Firebase](https://firebase.google.com/) (Auth, Firestore)
+- **Backend/Auth**: [Firebase](https://firebase.google.com/) (Auth, Firestore, Analytics) & [MongoDB](https://www.mongodb.com/) (Data Storage)
+- **Database ORM**: [Prisma](https://www.prisma.io/)
 - **Deployment**: [Vercel](https://vercel.com/)
 
 ## 📂 Project Structure
@@ -29,18 +30,20 @@ A modern, interactive, and high-performance personal portfolio website built wit
 ```bash
 kazuto-portofolio/
 ├── public/              # Static assets (images, icons)
+├── prisma/              # Prisma schema and migrations
 ├── src/
 │   ├── app/             # Next.js App Router pages
 │   │   ├── admin/       # Admin Dashboard routes
-│   │   ├── api/         # API Routes
+│   │   ├── api/         # API Routes (Uploads, Experience, etc.)
 │   │   ├── layout.tsx   # Root layout
 │   │   └── page.tsx     # Home page
 │   ├── components/
+│   │   ├── admin/       # Admin specific components
 │   │   ├── layout/      # Layout components (Navbar, Footer)
-│   │   ├── sections/    # Homepage sections (Hero, About, etc.)
+│   │   ├── sections/    # Homepage sections (Hero, About, Experience, etc.)
 │   │   └── ui/          # Reusable UI components
 │   ├── data/            # Static data (portfolio items)
-│   ├── lib/             # Utilities and configurations (Firebase, etc.)
+│   ├── lib/             # Utilities (Firebase, Prisma, etc.)
 │   └── types/           # TypeScript definitions
 ├── next.config.ts       # Next.js configuration
 ├── tailwind.config.ts   # Tailwind configuration
@@ -64,18 +67,37 @@ kazuto-portofolio/
 
 3.  **Set up Environment Variables**
 
-    Create a `.env.local` file in the root directory and add your Firebase credentials:
+    Create a `.env.local` file in the root directory and add your credentials:
 
     ```env
+    # Firebase Configuration
     NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
     NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
     NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
     NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id
+
+    # MongoDB & Prisma Configuration
+    DATABASE_URL="mongodb+srv://<username>:<password>@<cluster>.mongodb.net/kazuto-portfolio?retryWrites=true&w=majority"
     ```
 
-4.  **Run the development server**
+4.  **Generate Prisma Client**
+
+    ```bash
+    npx prisma generate
+    ```
+
+5.  **Configure Firebase Security**
+
+    Copy the contents of `firestore.rules` to your Firebase Console under **Firestore Database > Rules** to secure your data.
+
+    **Admin Access:**
+    The admin panel is at `/admin`. Access is restricted to configured email addresses.
+    To change this, update `src/lib/admin.ts` and `firestore.rules`.
+
+6.  **Run the development server**
 
     ```bash
     npm run dev

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FolderKanban, Award, Settings, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, FolderKanban, Award, Settings, Users, LogOut, MessageSquare, Briefcase } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -20,9 +20,19 @@ const sidebarItems = [
     icon: FolderKanban,
   },
   {
+    title: "Experience",
+    href: "/admin/experience",
+    icon: Briefcase,
+  },
+  {
     title: "Certificates",
     href: "/admin/certificates",
     icon: Award,
+  },
+  {
+    title: "Messages",
+    href: "/admin/messages",
+    icon: MessageSquare,
   },
   {
     title: "Settings",

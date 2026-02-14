@@ -15,8 +15,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { collection, getDocs, deleteDoc, doc, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Project } from "@/components/admin/ProjectForm";
 
@@ -27,15 +25,11 @@ export default function ProjectsPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const fetchProjects = async () => {
-    if (!db) return;
     setLoading(true);
     try {
-      const q = query(collection(db, "projects"), orderBy("createdAt", "desc"));
-      const querySnapshot = await getDocs(q);
-      const projectsData = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Project[];
+      const res = await fetch('/api/projects');
+      if (!res.ok) throw new Error('Failed to fetch projects');
+      const projectsData = await res.json();
       setProjects(projectsData);
     } catch (error) {
       console.error("Error fetching projects:", error);
@@ -52,10 +46,9 @@ export default function ProjectsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this project?")) return;
 
-    if (!db) return;
-
     try {
-      await deleteDoc(doc(db, "projects", id));
+      const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete project');
       toast.success("Project deleted successfully");
       fetchProjects(); // Refresh list
     } catch (error) {

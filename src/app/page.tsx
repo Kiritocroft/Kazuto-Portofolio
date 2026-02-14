@@ -15,7 +15,7 @@ export default function Home() {
       <Contact />
       
       <footer className="py-8 text-center text-sm text-muted-foreground border-t bg-background/50 backdrop-blur-sm">
-        <p>© {new Date().getFullYear()} Muhammad Nabil Athaillah. All rights reserved.</p>
+        <p suppressHydrationWarning>© {new Date().getFullYear()} Muhammad Nabil Athaillah. All rights reserved.</p>
       </footer>
     </>
   );

@@ -8,9 +8,10 @@ function easeOutCubic(t: number) {
   return 1 - Math.pow(1 - t, 3);
 }
 
-interface IconCloudProps {
+export interface IconCloudProps {
   icons?: React.ReactNode[];
   images?: string[];
+  radius?: number;
 }
 
 interface IconPosition {
@@ -35,7 +36,7 @@ interface TargetRotation extends Rotation {
   duration: number;
 }
 
-export function IconCloud({ icons, images }: IconCloudProps) {
+export function IconCloud({ icons, images, radius = 200 }: IconCloudProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [iconPositions, setIconPositions] = useState<IconPosition[]>([]);
   const [rotation, setRotation] = useState<Rotation>({ x: 0, y: 0 });
@@ -121,16 +122,16 @@ export function IconCloud({ icons, images }: IconCloudProps) {
       const z = Math.sin(phi) * r;
 
       newIcons.push({
-        x: x * 100,
-        y: y * 100,
-        z: z * 100,
+        x: x * radius,
+        y: y * radius,
+        z: z * radius,
         scale: 1,
         opacity: 1,
         id: i,
       });
     }
     setIconPositions(newIcons);
-  }, [icons, images]);
+  }, [icons, images, radius]);
 
   // Handle mouse events
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -318,8 +319,8 @@ export function IconCloud({ icons, images }: IconCloudProps) {
   return (
     <canvas
       ref={canvasRef}
-      width={400}
-      height={400}
+      width={radius * 2 + 100}
+      height={radius * 2 + 100}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

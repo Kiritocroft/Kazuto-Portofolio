@@ -1,49 +1,129 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FolderKanban, Award, Eye, Loader2 } from "lucide-react";
-import { collection, getCountFromServer, doc, getDoc } from "firebase/firestore";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Users, FolderKanban, Award, Eye, Loader2, MessageSquare, Briefcase } from "lucide-react";
+import { collection, getCountFromServer, doc, getDoc, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+
+interface ActivityItem {
+  id: string;
+  type: 'project' | 'certificate' | 'experience' | 'message';
+  title: string;
+  subtitle: string;
+  date: Date;
+}
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     projects: 0,
-    certificates: 0, // Placeholder for now as we don't have certificates collection yet
+    certificates: 0,
     visitors: 0,
-    activeUsers: 0, // Placeholder
+    activeUsers: 0,
+    experiences: 0,
   });
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      if (!db) return;
+    const fetchData = async () => {
+      // 1. Fetch Stats from API (Prisma)
+      let statsData: any = {};
+      try {
+        const statsRes = await fetch('/api/stats');
+        if (statsRes.ok) {
+          statsData = await statsRes.json();
+        }
+      } catch (error) {
+        console.error("Error fetching stats:", error);
+      }
+      
+      // 2. Fetch Recent Activity from API (Prisma)
+      let activityData: any = {};
+      try {
+        const activityRes = await fetch('/api/activity');
+        if (activityRes.ok) {
+          activityData = await activityRes.json();
+        }
+      } catch (error) {
+        console.error("Error fetching activity:", error);
+      }
 
       try {
-        // Fetch Projects Count
-        const projectsColl = collection(db, "projects");
-        const projectsSnapshot = await getCountFromServer(projectsColl);
-        const projectsCount = projectsSnapshot.data().count;
+        // 3. Fetch Firestore Data (Visitors, Messages)
+        let visitorsCount = 0;
+        let recentMessages: ActivityItem[] = [];
 
-        // Fetch Visitors Count
-        const analyticsRef = doc(db, "analytics", "general");
-        const analyticsSnap = await getDoc(analyticsRef);
-        const visitorsCount = analyticsSnap.exists() ? analyticsSnap.data().visitors : 0;
+        if (db) {
+          // Visitors
+          const analyticsRef = doc(db, "analytics", "general");
+          const analyticsSnap = await getDoc(analyticsRef);
+          visitorsCount = analyticsSnap.exists() ? analyticsSnap.data().visitors : 0;
+
+          // Messages
+          const messagesQ = query(collection(db, "messages"), orderBy("createdAt", "desc"), limit(5));
+          const messagesSnap = await getDocs(messagesQ);
+          recentMessages = messagesSnap.docs.map(doc => {
+             const data = doc.data();
+             return {
+               id: doc.id,
+               type: 'message',
+               title: data.displayName || "Anonymous",
+               subtitle: data.text || "No content",
+               date: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+             };
+          });
+        }
+
+        // Process Prisma Activities
+        const prismaActivities: ActivityItem[] = [
+          ...(activityData.projects || []).map((p: any) => ({
+            id: p.id,
+            type: 'project',
+            title: p.title,
+            subtitle: p.category || "Project",
+            date: new Date(p.createdAt),
+          })),
+          ...(activityData.certificates || []).map((c: any) => ({
+            id: c.id,
+            type: 'certificate',
+            title: c.title,
+            subtitle: c.issuer || "Certificate",
+            date: new Date(c.createdAt),
+          })),
+          ...(activityData.experiences || []).map((e: any) => ({
+            id: e.id,
+            type: 'experience',
+            title: e.title,
+            subtitle: e.company || "Experience",
+            date: new Date(e.createdAt),
+          })),
+        ];
+
+        // Merge and Sort
+        const allActivities = [...prismaActivities, ...recentMessages]
+          .sort((a, b) => b.date.getTime() - a.date.getTime())
+          .slice(0, 5);
 
         setStats({
-          projects: projectsCount,
-          certificates: 8, // Static for now
+          projects: statsData.projects || 0,
+          certificates: statsData.certificates || 0,
           visitors: visitorsCount,
-          activeUsers: 1, // Static for now (current admin)
+          activeUsers: 1, // Static for now
+          experiences: 0, // Need to add count to stats API if needed
         });
+        setActivities(allActivities);
+
       } catch (error) {
-        console.error("Error fetching dashboard stats:", error);
+        console.error("Error processing dashboard data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStats();
+    fetchData();
   }, []);
 
   const statCards = [
@@ -72,6 +152,26 @@ export default function AdminDashboard() {
       description: "Current admin session",
     },
   ];
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'project': return <FolderKanban className="h-4 w-4 text-blue-500" />;
+      case 'certificate': return <Award className="h-4 w-4 text-yellow-500" />;
+      case 'experience': return <Briefcase className="h-4 w-4 text-purple-500" />;
+      case 'message': return <MessageSquare className="h-4 w-4 text-green-500" />;
+      default: return <Loader2 className="h-4 w-4" />;
+    }
+  };
+
+  const getActivityText = (type: string) => {
+     switch (type) {
+      case 'project': return "New project added";
+      case 'certificate': return "New certificate added";
+      case 'experience': return "New experience added";
+      case 'message': return "New message received";
+      default: return "Activity";
+    }
+  };
 
   if (loading) {
     return (
@@ -113,21 +213,70 @@ export default function AdminDashboard() {
         <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>
+              Latest updates across your portfolio.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-center h-40 text-muted-foreground">
-              No recent activity to show.
-            </div>
+            {activities.length === 0 ? (
+               <div className="flex items-center justify-center h-40 text-muted-foreground">
+                No recent activity to show.
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {activities.map((activity) => (
+                  <div key={`${activity.type}-${activity.id}`} className="flex items-center">
+                    <div className="flex items-center justify-center w-9 h-9 rounded-full bg-muted border border-border">
+                        {getActivityIcon(activity.type)}
+                    </div>
+                    <div className="ml-4 space-y-1">
+                      <p className="text-sm font-medium leading-none">{activity.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {getActivityText(activity.type)}: {activity.subtitle}
+                      </p>
+                    </div>
+                    <div className="ml-auto font-medium text-xs text-muted-foreground">
+                      {new Date(activity.date).toLocaleDateString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
+        
         <Card className="col-span-3">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>
+              Manage your content efficiently.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-             <div className="flex items-center justify-between p-2 hover:bg-muted rounded-lg cursor-pointer transition-colors">
-                <span className="text-sm font-medium">Add New Project</span>
-             </div>
+             <Button variant="outline" className="w-full justify-start" asChild>
+               <Link href="/admin/projects/new">
+                 <FolderKanban className="mr-2 h-4 w-4" />
+                 Add New Project
+               </Link>
+             </Button>
+             <Button variant="outline" className="w-full justify-start" asChild>
+               <Link href="/admin/certificates/new">
+                 <Award className="mr-2 h-4 w-4" />
+                 Add New Certificate
+               </Link>
+             </Button>
+             <Button variant="outline" className="w-full justify-start" asChild>
+               <Link href="/admin/experience/new">
+                 <Briefcase className="mr-2 h-4 w-4" />
+                 Add New Experience
+               </Link>
+             </Button>
+             <Button variant="outline" className="w-full justify-start" asChild>
+               <Link href="/admin/settings">
+                 <Eye className="mr-2 h-4 w-4" />
+                 Update Profile Settings
+               </Link>
+             </Button>
           </CardContent>
         </Card>
       </div>

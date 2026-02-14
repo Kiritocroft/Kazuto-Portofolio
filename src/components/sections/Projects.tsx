@@ -1,12 +1,63 @@
 "use client";
 
-import { portfolioData } from "@/data/portfolio";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 
+interface Project {
+  id: string;
+  title: string;
+  description: string;
+  image: string;
+  link: string;
+  tags: string[];
+}
+
 export function Projects() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch('/api/projects');
+        if (!res.ok) throw new Error('Failed to fetch projects');
+        const projectsData = await res.json();
+        setProjects(projectsData);
+      } catch (error) {
+        console.error("Error fetching projects:", error);
+        setError("Failed to load projects. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProjects();
+  }, []);
+
+  if (loading) {
+    return (
+      <section id="projects" className="py-24 relative overflow-hidden bg-gradient-to-b from-background to-background/50">
+        <div className="container mx-auto px-4 flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section id="projects" className="py-24 relative overflow-hidden bg-gradient-to-b from-background to-background/50">
+        <div className="container mx-auto px-4 text-center text-destructive">
+          <p>{error}</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id="projects" className="py-24 relative overflow-hidden bg-gradient-to-b from-background to-background/50">
       <div className="container mx-auto px-4">
@@ -26,7 +77,12 @@ export function Projects() {
 
         {/* Projects List */}
         <div className="flex flex-col gap-24">
-          {portfolioData.projects.map((project, index) => (
+          {projects.length === 0 ? (
+            <div className="text-center text-muted-foreground">
+              No projects found. Please add projects via the Admin Panel.
+            </div>
+          ) : (
+            projects.map((project, index) => (
             <motion.div
               key={project.id}
               initial={{ opacity: 0, y: 40 }}
@@ -39,7 +95,7 @@ export function Projects() {
                  <div className={`lg:col-span-7 relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-muted/20 ${index % 2 === 1 ? "lg:order-2" : "lg:order-1"}`}>
                     <div className="relative aspect-video w-full overflow-hidden">
                        <Image 
-                          src={project.imageSrc} 
+                          src={project.image} 
                           alt={project.title}
                           fill
                           className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -63,7 +119,7 @@ export function Projects() {
                     </div>
 
                     <div className="flex flex-wrap gap-2 mb-6">
-                      {project.techStack.map((tech) => (
+                      {project.tags?.map((tech) => (
                         <span 
                           key={tech} 
                           className="px-4 py-1.5 text-sm font-medium bg-secondary/50 text-secondary-foreground rounded-full border border-border hover:bg-secondary transition-colors cursor-default"
@@ -83,7 +139,7 @@ export function Projects() {
                  </div>
                </div>
             </motion.div>
-          ))}
+          )))}
         </div>
       </div>
     </section>

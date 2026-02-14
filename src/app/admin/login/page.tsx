@@ -1,42 +1,45 @@
 "use client";
 
 import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
+import { isAdminEmail } from "@/lib/admin";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lock, Mail } from "lucide-react";
-import { toast } from "sonner"; // Assuming sonner or similar toast is used, or I'll use alert for now if not installed. 
-// I'll check package.json for toast. If not, I'll just use simple state error.
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    if (!auth) {
-        setError("Firebase not initialized");
-        setLoading(false);
-        return;
+  const handleGoogleLogin = async () => {
+    if (!auth || !googleProvider) {
+      setError("Google auth not initialized");
+      return;
     }
-
+    
+    setGoogleLoading(true);
+    setError("");
+    
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/admin");
+      const result = await signInWithPopup(auth, googleProvider);
+      if (isAdminEmail(result.user.email)) {
+        toast.success("Welcome back, Admin!");
+        router.push("/admin");
+      } else {
+        await auth.signOut();
+        setError("Unauthorized access. You are not an admin.");
+        toast.error("Unauthorized access");
+      }
     } catch (err: any) {
       console.error(err);
-      setError("Invalid email or password");
+      setError("Google sign in failed");
+      toast.error("Google sign in failed");
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   };
 
@@ -45,41 +48,33 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold">Admin Login</CardTitle>
-          <CardDescription>Enter your credentials to access the dashboard</CardDescription>
+          <CardDescription>Sign in with your authorized Google account</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="email"
-                  placeholder="Email"
-                  className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+          <div className="space-y-4">
+            {error && (
+              <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/10 rounded-md text-center">
+                {error}
               </div>
-            </div>
-            <div className="space-y-2">
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="password"
-                  placeholder="Password"
-                  className="pl-10"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
+            )}
+            
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="w-full" 
+              onClick={handleGoogleLogin}
+              disabled={googleLoading}
+            >
+              {googleLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+                  <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
+                </svg>
+              )}
+              Sign in with Google
             </Button>
-          </form>
+          </div>
         </CardContent>
       </Card>
     </div>

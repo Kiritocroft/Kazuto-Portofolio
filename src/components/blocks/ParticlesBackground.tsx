@@ -9,6 +9,57 @@ interface ParticlesBackgroundProps {
   interactive?: boolean;
 }
 
+class Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  canvas: HTMLCanvasElement;
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
+    this.x = Math.random() * canvas.width;
+    this.y = Math.random() * canvas.height;
+    this.vx = (Math.random() - 0.5) * 0.5;
+    this.vy = (Math.random() - 0.5) * 0.5;
+    this.size = Math.random() * 2 + 1;
+  }
+
+  update(mouse: { x: number; y: number }, interactive: boolean) {
+    this.x += this.vx;
+    this.y += this.vy;
+
+    if (this.x < 0 || this.x > this.canvas.width) this.vx *= -1;
+    if (this.y < 0 || this.y > this.canvas.height) this.vy *= -1;
+
+    // Mouse interaction
+    if (interactive) {
+      const dx = mouse.x - this.x;
+      const dy = mouse.y - this.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < 200) {
+        const forceDirectionX = dx / distance;
+        const forceDirectionY = dy / distance;
+        const force = (200 - distance) / 200;
+        const directionX = forceDirectionX * force * 0.5;
+        const directionY = forceDirectionY * force * 0.5;
+        this.vx += directionX;
+        this.vy += directionY;
+      }
+    }
+  }
+
+  draw(ctx: CanvasRenderingContext2D, color: string) {
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 const ParticlesBackground: React.FC<ParticlesBackgroundProps> = ({
   color = "#6366f1", // Primary indigo color by default
   particleCount = 100,
@@ -19,7 +70,14 @@ const ParticlesBackground: React.FC<ParticlesBackgroundProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
 
+  const [mounted, setMounted] = React.useState(false);
+
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -36,61 +94,11 @@ const ParticlesBackground: React.FC<ParticlesBackgroundProps> = ({
       initParticles();
     };
 
-    class Particle {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      size: number;
-
-      constructor() {
-        this.x = Math.random() * canvas!.width;
-        this.y = Math.random() * canvas!.height;
-        this.vx = (Math.random() - 0.5) * 0.5;
-        this.vy = (Math.random() - 0.5) * 0.5;
-        this.size = Math.random() * 2 + 1;
-      }
-
-      update() {
-        this.x += this.vx;
-        this.y += this.vy;
-
-        if (this.x < 0 || this.x > canvas!.width) this.vx *= -1;
-        if (this.y < 0 || this.y > canvas!.height) this.vy *= -1;
-
-        // Mouse interaction
-        if (interactive) {
-          const dx = mouseRef.current.x - this.x;
-          const dy = mouseRef.current.y - this.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < 200) {
-            const forceDirectionX = dx / distance;
-            const forceDirectionY = dy / distance;
-            const force = (200 - distance) / 200;
-            const directionX = forceDirectionX * force * 0.5;
-            const directionY = forceDirectionY * force * 0.5;
-            this.vx += directionX;
-            this.vy += directionY;
-          }
-        }
-      }
-
-      draw() {
-        if (!ctx) return;
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.5;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
     const initParticles = () => {
       particles = [];
       const count = window.innerWidth < 768 ? particleCount / 2 : particleCount;
       for (let i = 0; i < count; i++) {
-        particles.push(new Particle());
+        particles.push(new Particle(canvas));
       }
     };
 
@@ -99,8 +107,8 @@ const ParticlesBackground: React.FC<ParticlesBackgroundProps> = ({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       for (let i = 0; i < particles.length; i++) {
-        particles[i].update();
-        particles[i].draw();
+        particles[i].update(mouseRef.current, !!interactive);
+        particles[i].draw(ctx, color);
 
         for (let j = i; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
@@ -142,7 +150,17 @@ const ParticlesBackground: React.FC<ParticlesBackgroundProps> = ({
       window.removeEventListener("mousemove", handleMouseMove);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [color, particleCount, connectionDistance, interactive]);
+  }, [mounted, color, particleCount, connectionDistance, interactive]);
+
+  if (!mounted) {
+    return (
+        <div
+        className="absolute inset-0 -z-10 w-full h-full overflow-hidden bg-background"
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-transparent to-background/80 pointer-events-none" />
+      </div>
+    );
+  }
 
   return (
     <div

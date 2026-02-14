@@ -3,47 +3,38 @@
 import { useEffect } from "react";
 import { doc, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { usePathname } from "next/navigation";
 
-export default function AnalyticsTracker() {
-  const pathname = usePathname();
-
+export function AnalyticsTracker() {
   useEffect(() => {
     const trackVisit = async () => {
       if (!db) return;
       
-      // Don't track admin pages
-      if (pathname?.startsWith("/admin")) return;
-      
-      // Use sessionStorage to count unique sessions per tab
-      const visitedKey = "portfolio_session_visit";
-      const hasVisited = sessionStorage.getItem(visitedKey);
+      // Use sessionStorage to track unique visits per session
+      if (sessionStorage.getItem("visited")) return;
 
-      if (!hasVisited) {
-        try {
-          const analyticsRef = doc(db, "analytics", "general");
-          const docSnap = await getDoc(analyticsRef);
+      try {
+        const analyticsRef = doc(db, "analytics", "general");
+        const docSnap = await getDoc(analyticsRef);
 
-          if (docSnap.exists()) {
-            await updateDoc(analyticsRef, {
-              visitors: increment(1),
-              lastVisit: new Date().toISOString()
-            });
-          } else {
-            await setDoc(analyticsRef, {
-              visitors: 1,
-              lastVisit: new Date().toISOString()
-            });
-          }
-          sessionStorage.setItem(visitedKey, "true");
-        } catch (error) {
-          console.error("Error tracking visit:", error);
+        if (docSnap.exists()) {
+          await updateDoc(analyticsRef, {
+            visitors: increment(1)
+          });
+        } else {
+          await setDoc(analyticsRef, {
+            visitors: 1,
+            views: 1
+          });
         }
+        
+        sessionStorage.setItem("visited", "true");
+      } catch (error) {
+        console.error("Error tracking analytics:", error);
       }
     };
 
     trackVisit();
-  }, [pathname]);
+  }, []);
 
   return null;
 }

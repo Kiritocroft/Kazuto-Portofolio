@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { isAdminEmail } from "@/lib/admin";
 import { useRouter, usePathname } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
@@ -22,8 +23,17 @@ export default function AdminLayout({
     }
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user && pathname !== "/admin/login") {
+      if (pathname === "/admin/login") {
+        setLoading(false);
+        return;
+      }
+
+      if (!user) {
         router.push("/admin/login");
+      } else if (!isAdminEmail(user.email)) {
+        // Logged in but not admin
+        console.warn("Unauthorized access attempt:", user.email);
+        router.push("/"); // Redirect to home
       }
       setLoading(false);
     });
