@@ -96,10 +96,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📞 Contact
 
 - **Name**: Muhammad Nabil Athaillah
-- **Email**: nabilathaillah@gmail.com
-- **LinkedIn**: [Muhammad Nabil Athaillah](https://www.linkedin.com/in/mnabilathaillah/)
+- **Email**: nabilathaillah33@gmail.com
+- **LinkedIn**: [Muhammad Nabil Athaillah](https://www.linkedin.com/in/nabil-athaillah)
 - **GitHub**: [Kiritocroft](https://github.com/Kiritocroft)
 
 ---
 
-&copy; 2024 Kazuto.dev. All Rights Reserved.
+&copy; 2026 Muhammad Nabil Athaillah. All rights reserved.
