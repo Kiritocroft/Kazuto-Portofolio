@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Navbar } from "@/components/layout/Navbar";
 import ParticlesBackground from "@/components/blocks/ParticlesBackground";
 import { portfolioData } from "@/data/portfolio";
+import { Toaster } from "@/components/ui/sonner";
+import AnalyticsTracker from "@/components/AnalyticsTracker";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta" });
@@ -44,6 +46,8 @@ export default function RootLayout({
           <main className="flex flex-col">
             {children}
           </main>
+          <AnalyticsTracker />
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
